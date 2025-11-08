@@ -1,0 +1,13 @@
+# Environments
+.env
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Images
+*.png

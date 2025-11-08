@@ -18,6 +18,7 @@ async def main():
             headless=False,
             args=['--start-maximized'],
             viewport={'width': 1920, 'height': 1080},
+            channel="chrome"
         )
 
         page = browser_context.pages[0] if browser_context.pages else await browser_context.new_page()
@@ -68,7 +69,6 @@ async def main():
             print(f"✗ Could not automatically navigate by clicking the link: {e}")
             print("   The script will continue on the current page. Please provide the lesson URL directly.")
 
-
         # Prompt for URL and start the automation loop
         while True:
             try:
@@ -94,6 +94,7 @@ async def main():
                             filename = None
                         
                         if filename:
+                            os.makedirs(os.path.dirname(filename), exist_ok=True)
                             with open(filename, "w", encoding="utf-8") as f:
                                 f.write(extracted_content)
                             print(f"✓ Extracted content saved to {filename}")

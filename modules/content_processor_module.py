@@ -85,77 +85,61 @@ async def extract_vtt_transcript(page):
     Extracts text transcript from a video by intercepting VTT files.
     """
     print("   ↳ Looking for video transcript (VTT file)...")
-    vtt_url = None
-    vtt_content = None
-
-    # Future to signal when VTT is found
-    vtt_found = asyncio.Future()
-
-    async def on_response(response):
-        nonlocal vtt_url, vtt_content
-        if ".vtt" in response.url:
-            print(f"   ✓ VTT file found: {response.url}")
-            vtt_url = response.url
-            try:
-                vtt_content = await response.text()
-                if not vtt_found.done():
-                    vtt_found.set_result(True)
-            except Exception as e:
-                if not vtt_found.done():
-                    vtt_found.set_exception(e)
-
-    page.on("response", on_response)
-
+    
     try:
         # Find the video iframe
-        video_iframe_locator = page.locator('iframe[title*="player.vimeo.com"]')
+        video_iframe_selector = 'iframe[title*="player.vimeo.com"]'
+        video_iframe_locator = page.locator(video_iframe_selector)
         if await video_iframe_locator.count() == 0:
             print("   ✗ Video iframe not found.")
             return None
         
-        video_frame = video_iframe_locator.first.frame_locator()
+        video_frame = page.frame_locator(video_iframe_selector)
 
-        # Find and handle the CC button
-        cc_button = video_frame.get_by_role('button', name='CC/subtitles')
-        if await cc_button.count() > 0:
-            is_pressed = await cc_button.get_attribute('aria-pressed')
-            if is_pressed != 'true':
-                print("   ► Clicking CC button to enable subtitles...")
-                await cc_button.click()
-            else:
-                print("   ✓ CC/subtitles already enabled.")
-        else:
-            print("   ✗ CC/subtitles button not found. VTT might load automatically.")
+        async with page.expect_response(lambda response: ".vtt" in response.url, timeout=30000) as response_info:
+            print("   ... Waiting for VTT file response...")
 
-        # Click the play button to ensure video starts and loads all assets
-        play_button = video_frame.get_by_role('button', name='Play')
-        if await play_button.count() > 0:
-            print("   ► Clicking play button to trigger transcript load...")
-            await play_button.click()
-        
-        # Wait for the VTT file to be intercepted, with a timeout
-        await asyncio.wait_for(vtt_found, timeout=15)
+            # Click the play button to ensure video starts and loads all assets
+            play_button = video_frame.get_by_role('button', name='Play')
+            if await play_button.count() > 0:
+                print("   ► Clicking play button...")
+                await play_button.click()
+
+            # Explicitly wait for the CC button to be visible
+            cc_button = video_frame.get_by_role('button', name='CC/subtitles')
+            try:
+                print("   ... Waiting for CC button to become visible...")
+                await cc_button.wait_for(state='visible', timeout=10000)
+                print("   ✓ CC button is visible.")
+                
+                is_pressed = await cc_button.get_attribute('aria-pressed')
+                if is_pressed != 'true':
+                    print("   ► Clicking CC button to enable subtitles...")
+                    await cc_button.click()
+                else:
+                    print("   ✓ CC/subtitles already enabled.")
+            
+            except Exception as e:
+                print(f"   ✗ Could not click CC button: {e}")
+
+        response = await response_info.value
+        vtt_content = await response.text()
+        print(f"   ✓ VTT file found: {response.url}")
 
         if vtt_content:
             # Parse the VTT content
             transcript = ""
             for caption in webvtt.read_buffer(StringIO(vtt_content)):
-                transcript += caption.text + " "
+                transcript += caption.text.strip() + " "
             print(f"   ✓ Successfully extracted transcript.")
             return transcript.strip()
         else:
             print("   ✗ VTT content was not captured.")
             return None
 
-    except asyncio.TimeoutError:
-        print("   ✗ Timed out waiting for VTT file. No transcript found.")
-        return None
     except Exception as e:
         print(f"   ✗ An error occurred during VTT extraction: {e}")
         return None
-    finally:
-        # Clean up the event listener
-        page.remove_listener("response", on_response)
 
 
 async def process_content(page, content_type):

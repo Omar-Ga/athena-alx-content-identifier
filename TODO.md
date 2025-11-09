@@ -27,13 +27,13 @@ This file tracks the implementation progress based on the `implementation-plan.m
 
 - [x] Create `modules/content_processor_module.py`.
 - [x] Implement PDF handling (do nothing, return `None`).
-- [ ] Implement Google Slides handling:
+- [x] Implement Google Slides handling:
     - [x] Set up Google Slides API credentials.
     - [x] Implement function to extract text from a presentation URL.
-- [ ] Implement Video handling:
-    - [ ] Implement network interception to find `.vtt` file URLs.
-    - [ ] Implement function to download and parse `.vtt` file into text.
-- [ ] Integrate `content_processor_module.py` into `main.py`.
+- [x] Implement Video handling:
+    - [x] Implement network interception to find `.vtt` file URLs.
+    - [x] Implement function to download and parse `.vtt` file into text.
+- [x] Integrate `content_processor_module.py` into `main.py`.
 
 ## Phase 4: MCQ Handler Module
 

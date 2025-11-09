@@ -34,11 +34,10 @@ This document contains all the necessary UI selectors for the ALX Athena automat
 | Element | Selector | Description |
 |---|---|---|
 | **Question Text** | `.mcq-question-text` | The container for the MCQ question text. |
-| **Answer Option 1** | `.mcq-option:nth-child(1)` | The first answer option. |
-| **Answer Option 2** | `.mcq-option:nth-child(2)` | The second answer option. |
-| **Answer Option 3** | `.mcq-option:nth-child(3)` | The third answer option. |
-| **Answer Option 4** | `.mcq-option:nth-child(4)` | The fourth answer option. |
-| **Next Question Button** | `.mcq-next-button` | The button to proceed to the next question in a quiz. |
+| **Answer Option** | `.mcq-option` | A single answer option container. |
+| **Next Question Button** | `button:has-text("Next")` | The button to proceed to the next question in a quiz. |
+| **Skip Question Button** | `button:has-text("skip")` | The button to skip the current question. |
+| **Back Question Button** | `button:has-text("back")` | The button to go back to the previous question. |
 
 ---
 

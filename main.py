@@ -3,9 +3,11 @@ import os
 from datetime import datetime
 from playwright.async_api import async_playwright
 from modules.login_module import login_to_admissions, login_to_ehub
-from config import ALX_EMAIL, ALX_PASSWORD
-from modules.navigator_module import detect_content_type, find_set_as_complete_button, find_next_lesson_button, find_confirmation_yes_button
+from config import ALX_EMAIL, ALX_PASSWORD, MAX_PAGES
+from modules.navigator_module import detect_content_type
 from modules.content_processor_module import process_content
+from modules.mcq_handler_module import handle_mcq_quiz
+from modules.completion_handler_module import handle_completion, click_next_lesson
 
 async def main():
     async with async_playwright() as p:
@@ -51,40 +53,47 @@ async def main():
             # Start waiting for the new page to open *before* clicking.
             async with browser_context.expect_page() as new_page_info:
                 print(f"Attempting to click the '{course_link_text}' course link...")
-                # Using get_by_role is a robust way to find links by their accessible name.
                 await page.get_by_role('link', name=course_link_text).click(timeout=7000)
 
             athena_page = await new_page_info.value
             print("✓ New course tab detected and captured.")
             
-            # Wait for the new page to load and switch focus to it.
             await athena_page.wait_for_load_state("domcontentloaded")
             await athena_page.bring_to_front()
             print(f"✓ Switched to new tab. Current URL: {athena_page.url}")
-
-            # Overwrite the 'page' variable to ensure all subsequent commands use the new tab.
             page = athena_page
 
         except Exception as e:
             print(f"✗ Could not automatically navigate by clicking the link: {e}")
             print("   The script will continue on the current page. Please provide the lesson URL directly.")
 
-        # Prompt for URL and start the automation loop
-        while True:
-            try:
-                target_url = input("\nEnter the lesson URL to begin automation (or 'q' to quit): ")
-                if target_url.lower() == 'q':
-                    break
-                if target_url:
-                    print(f"Navigating to {target_url}...")
-                    await page.goto(target_url, wait_until="domcontentloaded")
-                    print(f"✓ Successfully navigated to {page.url}")
-                    
-                    # === AUTOMATION STARTS HERE ===
-                    content_type = await detect_content_type(page)
-                    extracted_content, content_type_processed = await process_content(page, content_type)
+        # Get the first lesson URL from the user
+        start_url = input("\nEnter the first lesson URL to begin automation (or 'q' to quit): ")
+        if start_url.lower() == 'q':
+            return
 
+        print(f"Navigating to starting URL: {start_url}...")
+        await page.goto(start_url, wait_until="domcontentloaded")
+        print(f"✓ Successfully navigated to {page.url}")
+
+        # Main automation loop
+        extracted_content_for_mcq = ""
+        for i in range(MAX_PAGES):
+            print(f"\n" + "="*60)
+            print(f"Processing page {i+1}/{MAX_PAGES}...")
+            print(f"Current URL: {page.url}")
+            print("="*60)
+
+            try:
+                # === AUTOMATION STARTS HERE ===
+                content_type = await detect_content_type(page)
+                
+                if content_type == "mcq":
+                    await handle_mcq_quiz(page, extracted_content_for_mcq)
+                else:
+                    extracted_content, content_type_processed = await process_content(page, content_type)
                     if extracted_content:
+                        extracted_content_for_mcq = extracted_content
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         if content_type_processed == 'slides':
                             filename = f"slides/extracted_slides_{timestamp}.txt"
@@ -99,16 +108,22 @@ async def main():
                                 f.write(extracted_content)
                             print(f"✓ Extracted content saved to {filename}")
 
+                    # Handle lesson completion for non-mcq pages
+                    await handle_completion(page)
 
-                    # Find key buttons
-                    print("\n🔍 Finding key buttons...")
-                    await find_set_as_complete_button(page)
-                    await find_next_lesson_button(page)
-                    await find_confirmation_yes_button(page)
-
+                # Navigate to the next lesson
+                if not await click_next_lesson(page):
+                    break # Exit loop if no "Next" button is found
 
             except Exception as e:
-                print(f"An error occurred: {e}")
+                print(f"An error occurred on page {page.url}: {e}")
+                print("Attempting to continue to the next lesson...")
+                if not await click_next_lesson(page):
+                    break
+
+        print("\n" + "="*60)
+        print("Automation loop finished.")
+        print("="*60)
         
         print("\nClosing browser...")
 

@@ -31,6 +31,12 @@ async def detect_content_type(page):
         print("   ↳ Content type: PDF")
         return "pdf"
 
+    # Detect MCQ content
+    is_mcq = await page.locator('.mcq-question-text').count()
+    if is_mcq > 0:
+        print("   ↳ Content type: MCQ")
+        return "mcq"
+
     print("   ↳ Content type: Unknown")
     return "unknown"
 
